@@ -1,0 +1,43 @@
+name: build-zmweb-ios-lib
+
+# 在云端 macOS 上把 iOS 原生扩展编成静态库 libZmWeb.a。
+# 不碰造梦1-5，也不打整包：只产出 .a，下载后放到 native/zmweb/ios/，再在本机用 build.py 打 ANE 和 IPA。
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native/zmweb/ios/**'
+      - '.github/workflows/build-ane.yml'
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Compile arm64 static library
+        working-directory: native/zmweb/ios
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun --sdk iphoneos clang \
+            -arch arm64 \
+            -isysroot "$SDK" \
+            -miphoneos-version-min=12.0 \
+            -fobjc-arc \
+            -I. \
+            -c ZmWeb.m -o ZmWeb.o
+          xcrun --sdk iphoneos libtool -static -o libZmWeb.a ZmWeb.o
+          lipo -info libZmWeb.a
+          ls -la libZmWeb.a
+
+      - name: Upload libZmWeb.a
+        uses: actions/upload-artifact@v4
+        with:
+          name: libZmWeb-ios-arm64
+          path: native/zmweb/ios/libZmWeb.a
+          if-no-files-found: error
